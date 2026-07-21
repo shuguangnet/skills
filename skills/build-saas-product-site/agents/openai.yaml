@@ -1,0 +1,4 @@
+interface:
+  display_name: "SaaS 产品官网构建"
+  short_description: "构建克制、精致且产品导向的 Astro SaaS 官网"
+  default_prompt: "Use $build-saas-product-site to build a polished Astro and Tailwind product website around my real product UI."

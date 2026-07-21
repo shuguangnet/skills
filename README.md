@@ -92,6 +92,10 @@ cd skills
 
 ## Skills 介绍
 
+### build-saas-product-site
+
+用于构建克制、精致且以真实产品界面为核心的 SaaS 或软件官网。规范覆盖参考站点分析、Astro + Tailwind CSS v4 技术选型、视觉系统、响应式布局、产品主视觉、动效、可访问性、浏览器截图验收、公网启动以及 Git 交付。
+
 ### temporary-ssh-access
 
 用于生成、授权、验证并清理远程服务器的临时 SSH 密钥访问。适合新 VPS 连接、服务器迁移、临时运维以及现有密钥无法登录等场景。
@@ -110,6 +114,10 @@ cd skills
 .
 ├── install.sh
 └── skills/
+    ├── build-saas-product-site/
+    │   ├── SKILL.md
+    │   ├── agents/
+    │   └── references/
     └── temporary-ssh-access/
         └── SKILL.md
 ```
