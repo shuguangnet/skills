@@ -67,19 +67,20 @@ resolve() {
 if [[ "$target" == *@* ]]; then remote_user="${target%@*}"; target_host="${target#*@}"; else remote_user="$default_user"; target_host="$target"; fi
 resolved_host="$target_host"; resolved_status=0
 if ! is_address "$target_host"; then resolved_host="$(resolve "$target_host")" || resolved_status=$?; [ "$resolved_status" = 2 ] && { echo "EasyTier 名称匹配多个地址，请明确选择" >&2; exit 2; }; [ "$resolved_status" != 0 ] && resolved_host="$target_host"; fi
-safe_host="$(sanitize "$target_host")"; stamp="$(date +%Y%m%d%H%M%S)"
+umask 077; safe_host="$(sanitize "$target_host")"; stamp="$(date +%Y%m%d%H%M%S)"
 suffix="$(openssl rand -hex 4 2>/dev/null || date +%s)"; comment="agent-temp-access-${safe_host}-$(date +%Y-%m-%d)-${suffix}"
 key_path="$HOME/.ssh/agent_temp_${safe_host}_${stamp}"; mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
 ssh-keygen -t ed25519 -f "$key_path" -N '' -C "$comment" >/dev/null; chmod 600 "$key_path"
 pub_line="$(cat "$key_path.pub")"; pub_q="$(quote_sq "$pub_line")"
 remote_auth="umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && grep -qxF ${pub_q} ~/.ssh/authorized_keys || printf '%s\\n' ${pub_q} >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys"
-remote_cleanup="tmp=\$(mktemp); grep -vxF ${pub_q} ~/.ssh/authorized_keys > \"\$tmp\" && cat \"\$tmp\" > ~/.ssh/authorized_keys; rm -f \"\$tmp\"; chmod 600 ~/.ssh/authorized_keys"
+remote_cleanup="tmp=\$(mktemp); grep -vxF ${pub_q} ~/.ssh/authorized_keys > \"\$tmp\" || true; cat \"\$tmp\" > ~/.ssh/authorized_keys; rm -f \"\$tmp\"; chmod 600 ~/.ssh/authorized_keys"
+host_q="$(quote_sq "$remote_user@$resolved_host")"; port_q="$(quote_sq "$port")"
 printf 'target_user=%s\ntarget_name=%s\nresolved_host=%s\nport=%s\nkey_path=%s\npublic_key=%s\n\n' "$remote_user" "$target_host" "$resolved_host" "$port" "$key_path" "$pub_line"
 printf '远端授权命令（以 %s 执行）：\n%s\n\n' "$remote_user" "$remote_auth"
-printf '验证：\nssh -i %s -p %s -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new %s@%s %s\n\n' "$(quote_sq "$key_path")" "$port" "$remote_user" "$resolved_host" "$(quote_sq 'hostname; whoami; uname -a')"
-printf 'SSH：\nssh -i %s -p %s -o StrictHostKeyChecking=accept-new %s@%s\n\n' "$(quote_sq "$key_path")" "$port" "$remote_user" "$resolved_host"
-printf 'SCP：\nscp -i %s -P %s -o StrictHostKeyChecking=accept-new ./file %s@%s:/tmp/\n\n' "$(quote_sq "$key_path")" "$port" "$remote_user" "$resolved_host"
-printf '清理（仅用户明确要求时）：\nssh -i %s -p %s -o BatchMode=yes %s@%s %s\n随后本机执行：rm -f %s %s\n' "$(quote_sq "$key_path")" "$port" "$remote_user" "$resolved_host" "$(quote_sq "$remote_cleanup")" "$(quote_sq "$key_path")" "$(quote_sq "$key_path.pub")"
+printf '验证：\nssh -i %s -p %s -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new %s %s\n\n' "$(quote_sq "$key_path")" "$port_q" "$host_q" "$(quote_sq 'hostname; whoami; uname -a')"
+printf 'SSH：\nssh -i %s -p %s -o StrictHostKeyChecking=accept-new %s\n\n' "$(quote_sq "$key_path")" "$port_q" "$host_q"
+printf 'SCP：\nscp -i %s -P %s -o StrictHostKeyChecking=accept-new ./file %s\n\n' "$(quote_sq "$key_path")" "$port_q" "$(quote_sq "$remote_user@$resolved_host:/tmp/")"
+printf '清理（仅用户明确要求时）：\nssh -i %s -p %s -o BatchMode=yes %s %s\n随后本机执行：rm -f %s %s\n' "$(quote_sq "$key_path")" "$port_q" "$host_q" "$(quote_sq "$remote_cleanup")" "$(quote_sq "$key_path")" "$(quote_sq "$key_path.pub")"
 ```
 
 不要把脚本输出中的私钥内容贴入对话；公钥整行可用于授权。脚本不能解析 EasyTier 时，将名称作为 SSH 主机名仅在用户确认 DNS/hosts 可用后使用。
