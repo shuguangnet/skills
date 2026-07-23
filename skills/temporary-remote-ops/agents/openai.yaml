@@ -1,0 +1,6 @@
+interface:
+  display_name: "Temporary Remote Ops"
+  short_description: "通过 EasyTier 和临时 SSH 安全执行远程运维"
+  default_prompt: "Use $temporary-remote-ops to establish an auditable temporary SSH session and complete the requested remote operation."
+policy:
+  allow_implicit_invocation: true

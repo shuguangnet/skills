@@ -96,6 +96,10 @@ cd skills
 
 用于构建克制、精致且以真实产品界面为核心的 SaaS 或软件官网。规范覆盖参考站点分析、Astro + Tailwind CSS v4 技术选型、视觉系统、响应式布局、产品主视觉、动效、可访问性、浏览器截图验收、公网启动以及 Git 交付。
 
+### migrate-docker-compose
+
+通过 SSH 将源服务器上的 Docker 容器、网络、卷、绑定目录和持久化数据整理为可审阅的 Docker Compose 项目，再迁移到目标服务器启动并验证。覆盖只读盘点、Compose 重建、数据库一致性、数据预同步、停机切换、健康检查和回滚，并可配合 `temporary-ssh-access` 建立临时 SSH 访问。
+
 ### temporary-ssh-access
 
 用于生成、授权、验证并清理远程服务器的临时 SSH 密钥访问。适合新 VPS 连接、服务器迁移、临时运维以及现有密钥无法登录等场景。
@@ -108,6 +112,16 @@ cd skills
 - 通过 SSH、SCP 或 rsync 执行后续操作
 - 任务结束后精确清理远端授权和本地密钥
 
+### temporary-remote-ops
+
+通过 EasyTier 节点解析和临时 SSH 凭据执行可审计的远程运维任务，覆盖备份、迁移、文件传输、服务操作、故障诊断、配置修改、结果核验和按需撤销访问。
+
+直接安装到 Codex：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shuguangnet/skills/main/install.sh | bash -s -- --target codex temporary-remote-ops
+```
+
 ## 项目结构
 
 ```text
@@ -118,8 +132,16 @@ cd skills
     │   ├── SKILL.md
     │   ├── agents/
     │   └── references/
-    └── temporary-ssh-access/
-        └── SKILL.md
+    ├── migrate-docker-compose/
+    │   ├── SKILL.md
+    │   ├── agents/
+    │   ├── references/
+    │   └── scripts/
+    ├── temporary-ssh-access/
+    │   └── SKILL.md
+    └── temporary-remote-ops/
+        ├── SKILL.md
+        └── agents/
 ```
 
 每个 skill 使用独立目录，入口文件为 `SKILL.md`。安装器会自动发现 `skills/*/SKILL.md`，新增 skill 时无需修改安装器。
