@@ -44,6 +44,7 @@ target="${1:?用法: bash temp-remote-ops.sh <host-or-node|user@host> [user] [po
 default_user="${2:-root}"
 port="${3:-22}"
 have() { command -v "$1" >/dev/null 2>&1; }
+require() { have "$1" || { printf '缺少依赖命令: %s\n' "$1" >&2; exit 1; }; }
 quote_sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 sanitize() { printf '%s' "$1" | tr -c 'A-Za-z0-9_.-' '_'; }
 is_address() { case "$1" in localhost|*.*|*:*) return 0;; *) return 1;; esac; }
@@ -61,10 +62,17 @@ resolve() {
   ips="$(printf '%s\n' "$lines" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | awk '!seen[$0]++')"
   [ -n "$ips" ] || return 1
   count="$(printf '%s\n' "$ips" | sed '/^$/d' | wc -l | tr -d ' ')"
-  [ "$count" = 1 ] || { printf '多个 EasyTier IP 候选:\n%s\n' "$ips" >&2; return 2; }
+  [ "$count" = 1 ] || {
+    printf 'EasyTier 匹配到多个候选。匹配行:\n%s\n候选 IP:\n%s\n' "$lines" "$ips" >&2
+    return 2
+  }
   printf '%s\n' "$ips"
 }
 if [[ "$target" == *@* ]]; then remote_user="${target%@*}"; target_host="${target#*@}"; else remote_user="$default_user"; target_host="$target"; fi
+[ -n "$remote_user" ] && [ -n "$target_host" ] || { echo '目标用户和主机不能为空' >&2; exit 2; }
+case "$port" in ''|*[!0-9]*) echo '端口必须是 1-65535 的数字' >&2; exit 2;; esac
+if (( port < 1 || port > 65535 )); then echo '端口必须是 1-65535 的数字' >&2; exit 2; fi
+for dependency in awk cat grep mktemp sed ssh-keygen tr; do require "$dependency"; done
 resolved_host="$target_host"; resolved_status=0
 if ! is_address "$target_host"; then resolved_host="$(resolve "$target_host")" || resolved_status=$?; [ "$resolved_status" = 2 ] && { echo "EasyTier 名称匹配多个地址，请明确选择" >&2; exit 2; }; [ "$resolved_status" != 0 ] && resolved_host="$target_host"; fi
 umask 077; safe_host="$(sanitize "$target_host")"; stamp="$(date +%Y%m%d%H%M%S)"
