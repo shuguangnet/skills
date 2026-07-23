@@ -69,14 +69,36 @@
 
     function formatCommands(raw) {
       let text = raw.replace(/\r\n?/g, '\n').replace(/[\t ]+$/gm, '');
-      // Replace prompts with a command boundary before joining visual line wraps.
-      text = text.replace(/(?:^|\n)\s*(?:[A-Za-z0-9._-]+@[A-Za-z0-9._-]+(?::[^#$\n]*)?|[A-Za-z0-9._-]+)\s*[#$]\s*/g, '\n@@COMMAND@@');
-      text = text.replace(/\s*\n\s*/g, ' ');
-      text = text.replace(/@@COMMAND@@/g, '\n');
-      // Terminal wrapping commonly inserts a space after a slash or before a split hyphen.
-      text = text.replace(/\/\s+(?=[A-Za-z0-9_.-])/g, '/');
-      text = text.replace(/([A-Za-z0-9])-\s+([A-Za-z0-9])/g, '$1-$2');
-      return text.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+      // Turn shell prompts into hard boundaries, then process visual wraps line by line.
+      text = text.replace(/(?:^|\n)\s*(?:[A-Za-z0-9._-]+@[A-Za-z0-9._-]+(?::[^#$\n]*)?|[A-Za-z0-9._-]+)\s*[#$]\s*/g, '\n@@COMMAND@@\n');
+      const commandStart = /\b(?:umask\b|mkdir\s+-p\b|ssh\s|scp\s|rsync\s|sudo\s|chmod\s|echo\s|grep\s|printf\s)/;
+      const commandBoundary = /^(?:umask\b|mkdir\s+-p\b|ssh\s|scp\s|rsync\s|sudo\s)/;
+      const commands = [];
+      let current = '';
+      let started = false;
+      const flush = () => { if (current.trim()) commands.push(current.trim()); current = ''; };
+
+      for (const rawLine of text.split('\n')) {
+        let line = rawLine.trim();
+        if (!line || line === '@@COMMAND@@') { if (line === '@@COMMAND@@') flush(); continue; }
+        const match = line.match(commandStart);
+        if (!started) {
+          if (!match) continue; // Ignore prose and standalone public-key examples before the command.
+          line = line.slice(match.index);
+          started = true;
+        } else if (commandBoundary.test(line) && current) {
+          flush();
+        }
+        current += (current ? ' ' : '') + line;
+      }
+      flush();
+
+      return commands.map(command => command
+        // Terminal wrapping commonly inserts a space after a slash or before a split hyphen.
+        .replace(/\/\s+(?=[A-Za-z0-9_.-])/g, '/')
+        .replace(/([A-Za-z0-9])-\s+([A-Za-z0-9])/g, '$1-$2')
+        .replace(/\s+/g, ' ')
+        .trim()).join('\n');
     }
 
     function setStatus(message, error = false) { status.textContent = message; status.style.color = error ? '#ff9d9d' : ''; }
@@ -84,6 +106,8 @@
       const result = formatCommands(input.value);
       output.value = result;
       setStatus(result ? '已格式化 ' + result.split('\n').length + ' 条命令。' : '请先粘贴终端内容。', !result);
+      const keyCount = (result.match(/ssh-ed25519\s+[A-Za-z0-9+/=]+/g) || []).length;
+      if (keyCount > 1) setStatus(`已格式化 ${result.split('\n').length} 条命令；检测到 ${keyCount} 把公钥，请确认使用的是同一把 key。`, true);
       return result;
     }
     async function copyResult() {
