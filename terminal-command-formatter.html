@@ -21,13 +21,13 @@
     textarea { display:block; width:100%; min-height:370px; resize:vertical; border:1px solid var(--line); border-radius:6px; background:#101316; color:var(--text); padding:14px; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
     textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
     .actions { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
-    button { border:1px solid var(--line); border-radius:6px; background:#232a31; color:var(--text); padding:9px 14px; font:inherit; cursor:pointer; }
+    button { border:1px solid var(--line); border-radius:6px; background:#232a31; color:var(--text); padding:10px 14px; min-height:42px; font:inherit; cursor:pointer; touch-action:manipulation; }
     button:hover { border-color:var(--accent); }
     button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:650; }
     .status { min-height:24px; color:var(--muted); font-size:13px; }
     .notes { margin-top:16px; color:var(--muted); font-size:13px; }
     .notes strong { color:var(--text); font-weight:600; }
-    @media (max-width:760px) { main { width:min(100% - 20px, 620px); padding-top:28px; } header { display:block; } .badge { display:inline-block; margin-top:16px; } .grid { grid-template-columns:1fr; } textarea { min-height:260px; } }
+    @media (max-width:760px) { main { width:min(100% - 20px, 620px); padding-top:28px; } header { display:block; } .badge { display:inline-block; margin-top:16px; } .grid { grid-template-columns:1fr; } textarea { min-height:240px; font-size:12px; } .actions { display:grid; grid-template-columns:1fr 1fr; } .actions button:first-child { grid-column:1 / -1; } }
   </style>
 </head>
 <body>
@@ -52,7 +52,8 @@
     </div>
 
     <div class="actions">
-      <button class="primary" id="format">格式化命令</button>
+      <button class="primary" id="format-copy">格式化并复制</button>
+      <button id="format">仅格式化</button>
       <button id="copy">复制结果</button>
       <button id="load-example">载入示例</button>
       <button id="clear">清空</button>
@@ -79,17 +80,21 @@
     }
 
     function setStatus(message, error = false) { status.textContent = message; status.style.color = error ? '#ff9d9d' : ''; }
-    document.querySelector('#format').addEventListener('click', () => {
+    function formatOnly() {
       const result = formatCommands(input.value);
       output.value = result;
-      setStatus(result ? `已格式化 ${result.split('\\n').length} 条命令。` : '请先粘贴终端内容。', !result);
-    });
-    document.querySelector('#copy').addEventListener('click', async () => {
+      setStatus(result ? '已格式化 ' + result.split('\n').length + ' 条命令。' : '请先粘贴终端内容。', !result);
+      return result;
+    }
+    async function copyResult() {
       if (!output.value) { setStatus('没有可复制的结果。', true); return; }
       try { await navigator.clipboard.writeText(output.value); setStatus('已复制到剪贴板。'); }
       catch { output.select(); document.execCommand('copy'); setStatus('已复制到剪贴板。'); }
-    });
-    document.querySelector('#load-example').addEventListener('click', () => { input.value = example; document.querySelector('#format').click(); });
+    }
+    document.querySelector('#format').addEventListener('click', formatOnly);
+    document.querySelector('#copy').addEventListener('click', copyResult);
+    document.querySelector('#format-copy').addEventListener('click', async () => { if (formatOnly()) await copyResult(); });
+    document.querySelector('#load-example').addEventListener('click', () => { input.value = example; formatOnly(); });
     document.querySelector('#clear').addEventListener('click', () => { input.value = ''; output.value = ''; setStatus('已清空。'); });
   </script>
 </body>
