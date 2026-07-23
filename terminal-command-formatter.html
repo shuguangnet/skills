@@ -106,7 +106,7 @@
       const result = formatCommands(input.value);
       output.value = result;
       setStatus(result ? '已格式化 ' + result.split('\n').length + ' 条命令。' : '请先粘贴终端内容。', !result);
-      const keyCount = (result.match(/ssh-ed25519\s+[A-Za-z0-9+/=]+/g) || []).length;
+      const keyCount = new Set((result.match(/ssh-ed25519\s+[A-Za-z0-9+/=]+\s+[^'\s]+/g) || [])).size;
       if (keyCount > 1) setStatus(`已格式化 ${result.split('\n').length} 条命令；检测到 ${keyCount} 把公钥，请确认使用的是同一把 key。`, true);
       return result;
     }
